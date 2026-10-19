@@ -1,0 +1,77 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gujarati–English Code-Mixed NLP</title>
+<style>
+:root{--bg:#f5f6fa;--card:#fff;--tx:#1d2330;--mut:#6b7385;--bd:#e3e6ee;--pri:#4f46e5;--GU:#bbf0cf;--EN:#c7dcff;--HI:#ffe0b0;--OTHER:#e8e9ee;--pos:#16a34a;--neg:#dc2626}
+[data-theme=dark]{--bg:#0f1219;--card:#181c27;--tx:#e8eaf2;--mut:#98a0b5;--bd:#2a3042;--GU:#1f5a3a;--EN:#233f73;--HI:#6b4a1c;--OTHER:#2a3042}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--bd)}
+h1{font-size:18px;margin:0}main{max-width:1000px;margin:20px auto;padding:0 16px}
+.tabs button{background:none;border:0;padding:8px 14px;color:var(--mut);cursor:pointer;font-size:15px;border-bottom:2px solid transparent}
+.tabs button.on{color:var(--pri);border-color:var(--pri);font-weight:600}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-top:14px}
+textarea{width:100%;min-height:90px;border:1px solid var(--bd);border-radius:8px;padding:10px;font-size:16px;background:var(--bg);color:var(--tx);resize:vertical}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:9px 20px;font-size:15px;cursor:pointer}.btn.sec{background:var(--bd);color:var(--tx)}
+.chip{display:inline-block;border:1px solid var(--bd);border-radius:20px;padding:3px 10px;margin:3px;font-size:13px;cursor:pointer;color:var(--mut)}
+.tok{display:inline-block;border-radius:8px;padding:5px 9px;margin:3px;text-align:center;font-size:15px}
+.tok small{display:block;font-size:11px;color:var(--mut)}.tok.low{opacity:.6;border:1px dashed var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.bar{height:8px;border-radius:4px;background:var(--bd);margin:2px 0 7px;overflow:hidden}.bar i{display:block;height:100%;background:var(--pri)}
+.row{display:flex;justify-content:space-between;font-size:13px}.big{font-size:22px;font-weight:700;text-transform:capitalize}
+.warn{color:#d97706;font-size:12px}.stat{font-size:13px;color:var(--mut)}.stat b{color:var(--tx);font-size:18px}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{border-bottom:1px solid var(--bd);padding:6px;text-align:left}
+select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:3px}
+.stack{display:flex;height:14px;border-radius:7px;overflow:hidden;margin:6px 0}
+</style></head><body>
+<header><h1>🗣️ Gujarati–English Code-Mixed Text Understanding</h1><button class="btn sec" onclick="theme()">🌓</button></header>
+<main>
+<div class="tabs"><button class="on" onclick="tab('a',this)">Analyze</button><button onclick="tab('b',this)">Batch</button><button onclick="tab('m',this);metrics()">Model</button></div>
+
+<section id="a"><div class="card">
+<textarea id="t" placeholder="Type Gujarati / Hindi / English mixed text… (Ctrl+Enter to analyze)">aaje movie bov saras hati yaar, mane full maja aavi!!! soooo good 😊</textarea>
+<div id="ex"></div><br><button class="btn" onclick="go()">Analyze</button></div>
+<div id="out"></div><div class="card" id="hist" style="display:none"><b>Recent</b><div id="hl"></div></div></section>
+
+<section id="b" style="display:none"><div class="card"><p class="stat">One message per line (max 200).</p>
+<textarea id="bt" style="min-height:160px"></textarea><br><br><button class="btn" onclick="batch()">Run batch</button>
+<button class="btn sec" onclick="dl()">Download CSV</button><div id="bo"></div></div></section>
+
+<section id="m" style="display:none"><div class="card" id="mo"></div>
+<p class="stat">Accuracy is measured on an unseen hand-written test set (model trained on generated data). Use the feedback buttons on the Analyze tab to correct predictions — the model retrains instantly.</p></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);let rows=[],cur="";
+const EX=["kem cho bhai? aaje match jovo che","aa phone nu camera saru nathi, bakvas 😡","dhokla ane fafda mast che yaar, restaurant best hatu","please refund karo, delivery bahu late thai","sarkar e budget ma shu aapyu?"];
+$('ex').innerHTML=EX.map(e=>`<span class="chip" onclick="$('t').value=this.textContent;go()">${e}</span>`).join('');
+$('t').addEventListener('keydown',e=>{if(e.ctrlKey&&e.key=='Enter')go()});
+function theme(){document.body.parentElement.dataset.theme=document.documentElement.dataset.theme=='dark'?'':'dark'}
+function tab(id,b){['a','b','m'].forEach(x=>$(x).style.display=x==id?'':'none');document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on')}
+const col=l=>`var(--${l})`;
+async function post(u,d){const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});return r.json()}
+async function go(){
+  cur=$('t').value.trim();if(!cur)return;$('out').innerHTML='<div class="card">Analyzing…</div>';
+  const d=await post('/api/analyze',{text:cur});if(d.error){$('out').textContent=d.error;return}
+  const a=d.analysis,P=d.predictions,tot=Object.values(a.distribution).reduce((x,y)=>x+y,0)||1;
+  let wi=0;const sInf=P.sentiment.influence;
+  const toks=a.tokens.map(t=>{let b='';if(t.lang!='OTHER'){const v=sInf[wi++]||0;if(Math.abs(v)>0.03)b=`box-shadow:0 3px 0 ${(P.sentiment.label=='negative'?v>0:v<0)?'var(--neg)':'var(--pos)'}`}
+    return `<span class="tok ${t.confidence<1?'low':''}" style="background:${col(t.lang)};${b}" title="normalized: ${t.normalized} | confidence ${t.confidence}">${t.token}<small>${t.lang}${t.gujarati?' · '+t.gujarati:''}</small></span>`}).join('');
+  const cards=Object.entries(P).map(([k,v])=>`<div class="card"><div class="stat">${k}</div><div class="big">${v.label} <span class="stat">${Math.round(v.confidence*100)}%</span></div>
+    ${v.uncertain?'<div class="warn">⚠ low confidence — please verify</div>':''}
+    ${Object.entries(v.scores).sort((x,y)=>y[1]-x[1]).map(([c,s])=>`<div class="row"><span>${c}</span><span>${Math.round(s*100)}%</span></div><div class="bar"><i style="width:${s*100}%"></i></div>`).join('')}
+    <div class="stat">Wrong? <select id="fb_${k}">${Object.keys(v.scores).map(c=>`<option>${c}</option>`).join('')}</select> <button class="btn sec" style="padding:2px 10px" onclick="fb('${k}')">Correct it</button></div></div>`).join('');
+  $('out').innerHTML=`<div class="card"><div class="grid"><div class="stat">Code-Mixing Index<br><b>${a.cmi}</b></div><div class="stat">Language switches<br><b>${a.switches}</b></div><div class="stat">Words<br><b>${tot}</b></div></div>
+   <div class="stack">${['GU','HI','EN'].map(l=>`<div style="width:${a.distribution[l]/tot*100}%;background:${col(l)}" title="${l}"></div>`).join('')}</div>
+   <div class="stat">🟩 Gujarati &nbsp;🟧 Hindi &nbsp;🟦 English &nbsp;· dashed = heuristic guess · underline = word that drove sentiment (green +, red −)</div><div style="margin-top:8px">${toks}</div>
+   <p class="stat">Normalized: <i>${a.normalized_text}</i></p></div><div class="grid">${cards}</div>`;
+  hist(cur,P);
+}
+async function fb(task){const label=$('fb_'+task).value;const r=await post('/api/feedback',{task,label,text:cur});alert(r.ok?'Saved. Model retrained ✔':'Error');go()}
+function hist(t,P){let h=JSON.parse(localStorage.getItem('h')||'[]').filter(x=>x.t!=t);h.unshift({t,s:P.sentiment.label,i:P.intent.label,p:P.topic.label});h=h.slice(0,8);localStorage.setItem('h',JSON.stringify(h));
+  $('hist').style.display='';$('hl').innerHTML=h.map(x=>`<div class="chip" onclick="$('t').value=this.dataset.t;go()" data-t="${x.t.replace(/"/g,'&quot;')}">${x.t.slice(0,60)} → ${x.s}/${x.i}/${x.p}</div>`).join('')}
+async function batch(){const d=await post('/api/batch',{texts:$('bt').value.split('\n')});rows=d.results;
+  $('bo').innerHTML='<table><tr><th>Text</th><th>Sentiment</th><th>Intent</th><th>Topic</th><th>CMI</th></tr>'+rows.map(r=>`<tr><td>${r.text}</td><td>${r.sentiment}</td><td>${r.intent}</td><td>${r.topic}</td><td>${r.cmi}</td></tr>`).join('')+'</table>'}
+function dl(){const c='text,sentiment,intent,topic,cmi\n'+rows.map(r=>[`"${r.text.replace(/"/g,'""')}"`,r.sentiment,r.intent,r.topic,r.cmi].join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='results.csv';a.click()}
+async function metrics(){const m=await (await fetch('/api/metrics')).json();
+  $('mo').innerHTML=Object.entries(m).map(([k,v])=>`<div class="row"><b>${k}</b><span>acc ${v.accuracy} · F1 ${v.macro_f1}</span></div><div class="bar"><i style="width:${v.accuracy*100}%"></i></div>
+  <div class="stat">train ${v.train_size} · test ${v.test_size} · feedback used ${v.feedback_used}</div><br>`).join('')}
+</script></body></html>
